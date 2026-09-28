@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sector Balance</title>
+<link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@400;600;800&family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+:root{
+  --wood:#8a5a34; --wood-dark:#6b4224; --parchment:#f2e2bd; --parchment-dark:#e3caa0;
+  --ink:#3a2b1a; --accent:#3f7d4e; --accent2:#c65a2b; --danger:#c0392b;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;
+  font-family:'Baloo 2',sans-serif; background:#1c130b; color:var(--ink);}
+#app{position:relative;width:100vw;height:100vh;overflow:hidden;}
+canvas{display:block;}
+.screen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;}
+.hidden{display:none !important;}
+button{cursor:pointer;font-family:'Baloo 2',sans-serif;font-weight:600;border:none;border-radius:10px;}
+.panel{background:var(--parchment);border:4px solid var(--wood-dark);border-radius:14px;
+  box-shadow:0 8px 0 var(--wood-dark), 0 10px 18px rgba(0,0,0,0.45);}
+h1,h2,h3{margin:0.2em 0;}
+</style>
+
+<style>
+#ui{position:absolute;inset:0;pointer-events:none;font-family:'Baloo 2',sans-serif;}
+#ui .clickable{pointer-events:auto;}
+
+/* ---- Title / difficulty screens ---- */
+.center-screen{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  flex-direction:column;pointer-events:auto;overflow:hidden;
+  background:linear-gradient(180deg,#8ecae6 0%,#a7d8b8 45%,#3a5f3a 75%,#1c130b 100%);}
+.center-screen .bgLayer{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+.bgSun{position:absolute;top:8%;left:12%;width:90px;height:90px;border-radius:50%;
+  background:#f2e2bd;box-shadow:0 0 60px 20px rgba(242,226,189,0.55);}
+.bgCloud{position:absolute;background:#fff;border-radius:40px;opacity:0.85;
+  box-shadow:30px 6px 0 -4px #fff, -30px 10px 0 -6px #fff, 0 -14px 0 -6px #fff;}
+.bgHill{position:absolute;bottom:0;width:100%;height:140px;border-radius:50% 50% 0 0 / 100% 100% 0 0;}
+.bgFloat{position:absolute;font-family:'Press Start 2P',cursive;font-size:14px;color:rgba(255,255,255,0.8);
+  text-shadow:1px 1px 0 rgba(0,0,0,0.25);}
+@keyframes driftCloud{ from{transform:translateX(-140px);} to{transform:translateX(calc(100vw + 140px));} }
+@keyframes bob{ 0%,100%{transform:translateY(0);} 50%{transform:translateY(-10px);} }
+.title-card{padding:36px 48px;text-align:center;max-width:640px;position:relative;z-index:2;}
+.link-btn{background:none;border:none;color:var(--wood-dark);text-decoration:underline;
+  font-size:14px;margin-top:14px;padding:4px;}
+.rules-card{width:520px;max-height:82vh;overflow-y:auto;padding:28px 32px;text-align:left;position:relative;z-index:2;}
+.rules-card h2{color:var(--accent2);margin-bottom:10px;}
+.rules-card h4{margin:14px 0 4px 0;color:var(--accent);}
+.rules-card p, .rules-card li{font-size:14px;line-height:1.5;margin:4px 0;}
+.rules-card ul{margin:4px 0 4px 20px;padding:0;}
+.legend-swatch{display:inline-block;width:14px;height:14px;border-radius:3px;margin-right:6px;vertical-align:middle;border:1px solid rgba(0,0,0,0.25);}
+.game-title{font-family:'Press Start 2P',cursive;font-size:28px;color:#f2e2bd;
+  text-shadow:3px 3px 0 #6b4224; margin-bottom:8px; line-height:1.5;}
+.subtitle{font-size:18px;color:#e3caa0;margin-bottom:28px;}
+.diff-row{display:flex;gap:20px;justify-content:center;flex-wrap:wrap;}
+.diff-card{width:230px;padding:18px;text-align:left;cursor:pointer;transition:transform 0.15s;}
+.diff-card:hover{transform:translateY(-4px);}
+.diff-card h3{font-size:20px;color:var(--accent2);margin-bottom:6px;}
+.diff-card p{font-size:14px;line-height:1.4;margin:4px 0;}
+.diff-card .tag{display:inline-block;background:var(--accent);color:#fff;font-size:12px;
+  padding:2px 8px;border-radius:6px;margin-top:8px;}
+.big-btn{margin-top:24px;padding:14px 34px;font-size:18px;background:var(--accent2);color:#fff;
+  border-radius:12px;box-shadow:0 5px 0 #8a3d1c;}
+.big-btn:active{transform:translateY(3px);box-shadow:0 2px 0 #8a3d1c;}
+
+/* ---- HUD ---- */
+#hud{position:absolute;top:0;left:0;right:0;display:flex;justify-content:space-between;
+  padding:10px 16px;pointer-events:none;}
+.hud-box{pointer-events:auto;padding:8px 14px;font-size:14px;display:flex;gap:14px;align-items:center;}
+.hud-box b{color:var(--accent2);}
+#turnBox{font-family:'Press Start 2P',cursive;font-size:12px;}
+
+/* ---- Sector balance graph, bottom-left ---- */
+#balanceHud{position:absolute;left:12px;bottom:12px;width:220px;padding:10px 12px;pointer-events:auto;}
+#balanceHud h4{margin:0 0 8px 0;font-size:13px;}
+.bal-row{display:flex;align-items:center;gap:6px;margin:4px 0;font-size:12px;}
+.bal-bar-track{flex:1;height:10px;background:#d8c6a0;border-radius:5px;overflow:hidden;}
+.bal-bar-fill{height:100%;border-radius:5px;}
+
+/* ---- Rival comparison, bottom-right ---- */
+#rivalHud{position:absolute;right:12px;bottom:12px;width:190px;padding:10px 12px;pointer-events:auto;font-size:12px;}
+
+/* ---- Tile legend, bottom-center ---- */
+#legendHud{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);
+  padding:8px 14px;pointer-events:auto;display:flex;gap:14px;flex-wrap:wrap;justify-content:center;max-width:520px;}
+.legend-item{font-size:11px;display:flex;align-items:center;white-space:nowrap;}
+
+/* ---- Build panel, right side ---- */
+#buildPanel{position:absolute;right:12px;top:70px;width:190px;padding:10px 12px;pointer-events:auto;}
+#buildPanel h4{margin:0 0 8px 0;font-size:13px;}
+.build-btn{display:flex;justify-content:space-between;align-items:center;width:100%;
+  background:var(--parchment-dark);margin:4px 0;padding:8px 10px;font-size:13px;border-radius:8px;}
+.build-btn.selected{background:var(--accent);color:#fff;}
+.build-btn:disabled{opacity:0.4;cursor:not-allowed;}
+#endTurnBtn{width:100%;margin-top:10px;padding:12px;background:var(--accent);color:#fff;font-size:14px;border-radius:10px;}
+#endTurnBtn:active{transform:translateY(2px);}
+
+/* ---- Event banner ---- */
+#eventBanner{position:absolute;top:70px;left:50%;transform:translateX(-50%);
+  padding:10px 20px;font-size:14px;text-align:center;pointer-events:none;
+  background:var(--parchment);border:3px solid var(--accent2);border-radius:10px;
+  box-shadow:0 4px 0 #8a3d1c; max-width:360px;}
+#eventBanner.hidden{display:none;}
+
+/* ---- Report / end overlay ---- */
+.overlay{position:absolute;inset:0;background:rgba(20,12,6,0.75);display:flex;
+  align-items:center;justify-content:center;pointer-events:auto;}
+.report-card{width:460px;max-height:80vh;overflow-y:auto;padding:26px 30px;}
+.report-card h2{color:var(--accent2);}
+.report-row{display:flex;justify-content:space-between;font-size:14px;margin:5px 0;padding:4px 0;
+  border-bottom:1px dashed #c8b078;}
+.concept-box{margin-top:14px;padding:10px 12px;background:var(--parchment-dark);border-radius:8px;
+  font-size:13px;border-left:4px solid var(--accent);}
+.lb-row{display:flex;justify-content:space-between;font-size:13px;padding:3px 0;}
+.lb-row.me{font-weight:800;color:var(--accent2);}
+input[type=range]{width:100%;}
+.skip-btn{position:absolute;bottom:16px;right:16px;padding:8px 16px;font-size:13px;
+  background:var(--accent2);color:#fff;border-radius:8px;pointer-events:auto;}
+</style>
+
+</head>
+<body>
+<div id="app">
+  <canvas id="game" width="1280" height="800"></canvas>
+
+<div id="ui">
+  <!-- TITLE SCREEN -->
+  <div id="screenTitle" class="center-screen">
+    <div class="bgLayer" id="bgLayer">
+      <div class="bgSun"></div>
+    </div>
+    <div class="title-card panel">
+      <div class="game-title">SECTOR<br>BALANCE</div>
+      <div class="subtitle">Grow farms, factories and shops &mdash; but keep them connected and in balance, or the whole economy stalls.</div>
+      <div class="diff-row">
+        <div class="diff-card panel clickable" data-diff="easy">
+          <h3>Town Planner</h3>
+          <p>8x8 map, 8 turns. Farms, factories and shops only. A calmer rival to learn the ropes against.</p>
+          <span class="tag">Grades 5-8</span>
+        </div>
+        <div class="diff-card panel clickable" data-diff="hard">
+          <h3>Chief Economist</h3>
+          <p>10x10 map, 10 turns. Adds mines, loans, road washouts, and a rival that adapts to your mistakes.</p>
+          <span class="tag">Grades 8-12</span>
+        </div>
+      </div>
+      <button id="howToPlayBtn" class="link-btn clickable">How to Play</button>
+    </div>
+  </div>
+
+  <!-- HOW TO PLAY -->
+  <div id="screenRules" class="center-screen hidden">
+    <div class="rules-card panel">
+      <h2>How to Play</h2>
+      <p>You're running a small regional economy against a rival region. Whoever builds the higher total GDP by the last turn wins.</p>
+
+      <h4>The Three Sectors</h4>
+      <ul>
+        <li><b>Primary</b> &mdash; Farms and Mines dig up or grow raw materials.</li>
+        <li><b>Secondary</b> &mdash; Factories turn raw materials into goods.</li>
+        <li><b>Tertiary</b> &mdash; Shops sell finished goods to customers for cash.</li>
+      </ul>
+
+      <h4>Terrain Key</h4>
+      <p><span class="legend-swatch" style="background:#5fa85a;"></span><b>Grass</b> &mdash; buildable land for Farms, Factories and Shops.</p>
+      <p><span class="legend-swatch" style="background:#a68a5b;"></span><b>Hill</b> &mdash; rocky land, only Mines can be built here.</p>
+      <p><span class="legend-swatch" style="background:#3f8fd1;"></span><b>River</b> &mdash; can't be built on, but Farms next to it resist droughts.</p>
+      <p><span class="legend-swatch" style="background:#c8a876;"></span><b>Road</b> &mdash; connects your buildings so goods can actually move.</p>
+
+      <h4>Roads Matter</h4>
+      <p>A Factory only works if a road path connects it to a Farm or Mine. A Shop only works if a road path connects it to a Factory. A disconnected building shows dimmed and produces little or nothing &mdash; check the small ring under each building: green means efficient, yellow is struggling, red is barely working.</p>
+
+      <h4>Keep It Balanced</h4>
+      <p>Too many Farms with too few Factories means raw materials pile up unsold. Too many Factories with too few Shops means goods pile up unsold. Watch the Sector Balance bars in-game to stay even.</p>
+
+      <h4>Each Turn</h4>
+      <p>A random event may hit (drought, festival, breakdown...). Spend cash building or laying roads. Press End Turn to watch goods move and see your report. Harder mode adds loans you can borrow and must repay with interest.</p>
+
+      <button class="big-btn clickable" id="closeRulesBtn" style="margin-top:16px;">Got it</button>
+    </div>
+  </div>
+
+  <!-- IN-GAME HUD -->
+  <div id="screenGame" class="hidden">
+    <div id="hud">
+      <div class="hud-box panel">Cash: <b id="cashVal">0</b></div>
+      <div class="hud-box panel" id="turnBox">Turn <span id="turnVal">1</span> / <span id="turnMax">8</span></div>
+      <div class="hud-box panel" id="debtBox">Debt: <b id="debtVal">0</b></div>
+    </div>
+
+    <div id="eventBanner" class="panel hidden"></div>
+
+    <div id="balanceHud" class="panel">
+      <h4>Sector Balance</h4>
+      <div class="bal-row">Primary <div class="bal-bar-track"><div id="barPrimary" class="bal-bar-fill" style="background:#3f7d4e;width:0%"></div></div></div>
+      <div class="bal-row">Secondary <div class="bal-bar-track"><div id="barSecondary" class="bal-bar-fill" style="background:#8a8f99;width:0%"></div></div></div>
+      <div class="bal-row">Tertiary <div class="bal-bar-track"><div id="barTertiary" class="bal-bar-fill" style="background:#c65a2b;width:0%"></div></div></div>
+    </div>
+
+    <div id="rivalHud" class="panel">
+      <b>Rival Region</b><br>
+      GDP: <span id="rivalGdp">0</span><br>
+      Your GDP: <span id="myGdp">0</span>
+    </div>
+
+    <div id="legendHud" class="panel">
+      <div class="legend-item"><span class="legend-swatch" style="background:#5fa85a;"></span>Grass &mdash; buildable</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#a68a5b;"></span>Hill &mdash; Mines only</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#3f8fd1;"></span>River &mdash; no building</div>
+      <div class="legend-item"><span class="legend-swatch" style="background:#c8a876;"></span>Road</div>
+    </div>
+
+    <div id="buildPanel" class="panel">
+      <h4>Build</h4>
+      <div id="buildButtons"></div>
+      <div id="loanControls" class="hidden" style="margin-top:8px;">
+        <button class="build-btn clickable" id="borrowBtn">Borrow 100</button>
+        <button class="build-btn clickable" id="repayBtn">Repay 50</button>
+      </div>
+      <button id="endTurnBtn" class="clickable">End Turn</button>
+    </div>
+  </div>
+
+  <!-- TURN REPORT -->
+  <div id="screenReport" class="overlay hidden">
+    <div class="report-card panel">
+      <h2>Turn <span id="repTurn"></span> Report</h2>
+      <div class="report-row"><span>Revenue</span><span id="repRevenue"></span></div>
+      <div class="report-row"><span>Costs</span><span id="repCost"></span></div>
+      <div class="report-row"><span>Profit</span><span id="repProfit"></span></div>
+      <div class="report-row"><span>Your GDP so far</span><span id="repMyGdp"></span></div>
+      <div class="report-row"><span>Rival GDP so far</span><span id="repRivalGdp"></span></div>
+      <div class="concept-box" id="repConcept"></div>
+      <button class="big-btn clickable" id="continueBtn" style="width:100%;margin-top:16px;">Continue</button>
+    </div>
+  </div>
+
+  <!-- END SCREEN -->
+  <div id="screenEnd" class="overlay hidden">
+    <div class="report-card panel">
+      <h2 id="endTitle">Final Results</h2>
+      <div class="report-row"><span>Your final GDP</span><span id="endMyGdp"></span></div>
+      <div class="report-row"><span>Rival final GDP</span><span id="endRivalGdp"></span></div>
+      <div class="concept-box" id="endSummary"></div>
+      <h3 style="margin-top:16px;">Leaderboard</h3>
+      <div id="lbList"></div>
+      <div id="nameEntry" class="hidden" style="margin-top:10px;">
+        <input type="text" id="nameInput" placeholder="Your name" style="width:100%;padding:8px;border-radius:6px;border:2px solid var(--wood-dark);">
+        <button class="big-btn clickable" id="saveScoreBtn" style="width:100%;margin-top:8px;">Save Score</button>
+      </div>
+      <button class="big-btn clickable" id="playAgainBtn" style="width:100%;margin-top:12px;">Play Again</button>
+    </div>
+  </div>
+
+  <button id="skipAnimBtn" class="skip-btn hidden clickable">Skip &raquo;</button>
+</div>
+
+</div>
+
+<script>
+/* ============ CONFIG ============ */
+const TILE_W = 64, TILE_H = 32; // isometric tile footprint
+const DIFFICULTY = {
+  easy: {
+    label: "Town Planner", grid: 8, turns: 8, startCash: 220,
+    buildings: ['farm','factory','shop'], rivalMode: 'steady',
+    eventChance: 0.28, washouts: false, loans: false,
+    rivalGrowth: 0.9
+  },
+  hard: {
+    label: "Chief Economist", grid: 10, turns: 10, startCash: 300,
+    buildings: ['farm','mine','factory','shop'], rivalMode: 'adaptive',
+    eventChance: 0.4, washouts: true, loans: true,
+    rivalGrowth: 1.15
+  }
+};
+
+const BUILD_INFO = {
+  farm:    { sector:'primary',   cost: 40, label:'Farm',    emoji:'farm' },
+  mine:    { sector:'primary',   cost: 55, label:'Mine',    emoji:'mine' },
+  factory: { sector:'secondary', cost: 70, label:'Factory', emoji:'factory' },
+  shop:    { sector:'tertiary',  cost: 60, label:'Shop',    emoji:'shop' },
+};
+const ROAD_COST = 8;
+
+let STATE = null; // main mutable game state, set on new game
+
+/* ============ CANVAS SETUP ============ */
+const canvas = document.getElementById('game');
+const ctx = canvas.getContext('2d');
+let DPR = Math.min(window.devicePixelRatio || 1, 2);
+
+function resize(){
+  const w = window.innerWidth, h = window.innerHeight;
+  canvas.style.width = w+'px'; canvas.style.height = h+'px';
+  canvas.width = Math.floor(w*DPR); canvas.height = Math.floor(h*DPR);
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+/* ============ MAP GENERATION ============ */
+function makeMap(size){
+  const tiles = [];
+  // simple clustered terrain: base grass, carve a river, scatter hills
+  const riverCol = 2 + Math.floor(Math.random()*(size-4));
+  for(let y=0;y<size;y++){
+    const row = [];
+    for(let x=0;x<size;x++){
+      let terrain = 'grass';
+      // river: a gently wandering diagonal band
+      const wander = Math.round(Math.sin(y*0.6)*1.2);
+      if (Math.abs(x - (riverCol+wander)) === 0) terrain = 'river';
+      row.push({x,y,terrain,building:null,road:false,flood:false});
+    }
+    tiles.push(row);
+  }
+  // scatter hills away from river, in a couple clusters
+  const hillClusters = 2;
+  for(let c=0;c<hillClusters;c++){
+    const cx = Math.floor(Math.random()*size), cy = Math.floor(Math.random()*size);
+    for(let dy=-1; dy<=1; dy++) for(let dx=-1; dx<=1; dx++){
+      const x=cx+dx, y=cy+dy;
+      if(x>=0&&y>=0&&x<size&&y<size && tiles[y][x].terrain==='grass' && Math.random()<0.6){
+        tiles[y][x].terrain='hill';
+      }
+    }
+  }
+  return tiles;
+}
+
+/* ============ ISO PROJECTION ============ */
+let camOffsetX = 0, camOffsetY = 120, zoom = 1;
+function isoToScreen(x,y){
+  return {
+    sx: (x-y)*(TILE_W/2)*zoom + camOffsetX,
+    sy: (x+y)*(TILE_H/2)*zoom + camOffsetY
+  };
+}
+function screenToIso(sx,sy){
+  sx -= camOffsetX; sy -= camOffsetY;
+  sx /= zoom; sy /= zoom;
+  const x = (sx/(TILE_W/2) + sy/(TILE_H/2))/2;
+  const y = (sy/(TILE_H/2) - sx/(TILE_W/2))/2;
+  return {x: Math.round(x), y: Math.round(y)};
+}
+
+console.log('Stage 1 loaded OK');
+</script>
+
+
+<script>
+/* ============ DRAWING HELPERS ============ */
+function drawTileDiamond(sx,sy,fill,stroke){
+  ctx.beginPath();
+  ctx.moveTo(sx, sy - TILE_H/2*zoom);
+  ctx.lineTo(sx + TILE_W/2*zoom, sy);
+  ctx.lineTo(sx, sy + TILE_H/2*zoom);
+  ctx.lineTo(sx - TILE_W/2*zoom, sy);
+  ctx.closePath();
+  ctx.fillStyle = fill;
+  ctx.fill();
+  if(stroke){ ctx.strokeStyle = stroke; ctx.lineWidth=1; ctx.stroke(); }
+}
+
+const TERRAIN_COLORS = {
+  grass: ['#5fa85a','#4e9349'],
+  hill:  ['#a68a5b','#8f7449'],
+  river: ['#3f8fd1','#3579b3'],
+};
+
+function terrainColor(t,x,y){
+  const pair = TERRAIN_COLORS[t];
+  return ((x+y)%2===0) ? pair[0] : pair[1];
+}
+
+function drawGround(){
+  const size = STATE.size;
+  for(let y=0;y<size;y++){
+    for(let x=0;x<size;x++){
+      const tile = STATE.tiles[y][x];
+      const {sx,sy} = isoToScreen(x,y);
+      let col = terrainColor(tile.terrain,x,y);
+      if(tile.flood) col = '#2b4d5e';
+      drawTileDiamond(sx,sy,col,'rgba(0,0,0,0.12)');
+      if(tile.road){
+        drawTileDiamond(sx,sy, tile.flood ? '#5a4a3a' : '#c8a876', 'rgba(0,0,0,0.2)');
+      }
+    }
+  }
+}
+
+/* simple pixel-block building sprites, drawn centered above tile */
+function drawBuilding(tile){
+  const {sx,sy} = isoToScreen(tile.x,tile.y);
+  const b = tile.building;
+  if(!b) return;
+  const baseY = sy - 6*zoom;
+  ctx.save();
+  ctx.translate(sx, baseY);
+  const s = zoom;
+  const dim = b.connected===false; // dim if disconnected
+  ctx.globalAlpha = dim ? 0.55 : 1;
+
+  if(b.type==='farm'){
+    ctx.fillStyle = '#caa34a';
+    ctx.fillRect(-16*s,-10*s,32*s,12*s);
+    ctx.fillStyle = '#7c4a2a';
+    ctx.fillRect(-16*s,-2*s,32*s,4*s);
+    for(let i=-12;i<=12;i+=6){
+      ctx.fillStyle='#3f7d2e';
+      ctx.fillRect(i*s-1*s,-16*s,2*s,8*s);
+    }
+  } else if(b.type==='mine'){
+    ctx.fillStyle = '#6b5c4d';
+    ctx.beginPath();
+    ctx.moveTo(-16*s,-2*s); ctx.lineTo(0,-26*s); ctx.lineTo(16*s,-2*s);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#2b2420';
+    ctx.beginPath(); ctx.arc(0,-8*s,5*s,0,Math.PI*2); ctx.fill();
+  } else if(b.type==='factory'){
+    ctx.fillStyle = '#8a8f99';
+    ctx.fillRect(-18*s,-20*s,36*s,20*s);
+    ctx.fillStyle = '#5c6068';
+    ctx.fillRect(-18*s,-24*s,10*s,6*s);
+    ctx.fillStyle = '#b9bec7';
+    for(let i=-12;i<=8;i+=8){
+      ctx.fillRect(i*s,-16*s,4*s,4*s);
+    }
+    // chimney smoke puff (static frame; animated in render loop separately)
+    if(b.efficiency>0.05){
+      ctx.fillStyle='rgba(220,220,220,0.7)';
+      const puffOffset = (Date.now()/300 + tile.x*13+tile.y*7)%10;
+      ctx.beginPath(); ctx.arc(-13*s, -26*s - puffOffset*s, 3*s,0,Math.PI*2); ctx.fill();
+    }
+  } else if(b.type==='shop'){
+    ctx.fillStyle = '#c65a2b';
+    ctx.fillRect(-15*s,-16*s,30*s,16*s);
+    ctx.fillStyle = '#e8d7b0';
+    for(let i=-15;i<15;i+=6){
+      ctx.fillStyle = (i/6)%2===0?'#c65a2b':'#e8d7b0';
+      ctx.fillRect(i*s,-20*s,6*s,5*s);
+    }
+    ctx.fillStyle='#5a3a20';
+    ctx.fillRect(-4*s,-8*s,8*s,8*s);
+  }
+
+  // efficiency indicator ring
+  if(b.efficiency !== undefined){
+    ctx.globalAlpha = 1;
+    let ringColor = b.efficiency > 0.66 ? '#3f7d4e' : (b.efficiency>0.33 ? '#d1a13a' : '#c0392b');
+    ctx.beginPath();
+    ctx.arc(0, 6*s, 4*s, 0, Math.PI*2);
+    ctx.fillStyle = ringColor;
+    ctx.fill();
+  }
+  ctx.restore();
+}
+
+function drawBuildings(){
+  const size = STATE.size;
+  // draw in painter's order (back to front) for correct overlap
+  for(let sum=0; sum<=2*(size-1); sum++){
+    for(let y=0;y<size;y++){
+      const x = sum-y;
+      if(x<0||x>=size) continue;
+      const tile = STATE.tiles[y][x];
+      if(tile.building) drawBuilding(tile);
+    }
+  }
+}
+
+function render(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = '#1c130b';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  if(STATE){
+    drawGround();
+    drawBuildings();
+  }
+  requestAnimationFrame(render);
+}
+render();
+
+console.log('Stage 2 loaded OK');
+</script>
+
+
+<script>
+/* ============ CONNECTIVITY ============ */
+function neighbors(x,y,size){
+  const out=[];
+  if(x>0) out.push([x-1,y]);
+  if(x<size-1) out.push([x+1,y]);
+  if(y>0) out.push([x,y-1]);
+  if(y<size-1) out.push([x,y+1]);
+  return out;
+}
+
+// A tile counts as "passable" for connectivity if it has a road, OR is itself
+// a building tile (so buildings connect directly to adjacent roads/buildings).
+function isPassable(tile){
+  return tile.road || !!tile.building;
+}
+
+// BFS from a source building tile across road network; returns set of building
+// tiles reachable (as "x,y" keys), used to test primary->secondary->tertiary links.
+function reachableBuildings(startTile, size){
+  const key = (x,y)=>x+','+y;
+  const seen = new Set([key(startTile.x,startTile.y)]);
+  const q = [[startTile.x,startTile.y]];
+  const found = [];
+  while(q.length){
+    const [cx,cy] = q.shift();
+    for(const [nx,ny] of neighbors(cx,cy,size)){
+      const t = STATE.tiles[ny][nx];
+      if(seen.has(key(nx,ny))) continue;
+      if(!isPassable(t)) continue;
+      seen.add(key(nx,ny));
+      q.push([nx,ny]);
+      if(t.building) found.push(t);
+    }
+  }
+  return found;
+}
+
+/* Recompute connectivity + efficiency for all buildings.
+   Rule: a secondary building is "supplied" if reachable (via road) from at least
+   one primary building; a tertiary building is "supplied" if reachable from at
+   least one secondary building. Primary buildings are always "connected" (they
+   just need a route out eventually) but their efficiency depends on whether
+   secondary demand exists to buy their output -- computed in economy step. */
+function recomputeConnectivity(){
+  const size = STATE.size;
+  for(let y=0;y<size;y++) for(let x=0;x<size;x++){
+    const t = STATE.tiles[y][x];
+    if(!t.building) continue;
+    if(t.building.type==='farm' || t.building.type==='mine'){
+      t.building.connected = true; // primary always structurally fine
+    } else if(t.building.type==='factory'){
+      const linked = reachableBuildings(t,size);
+      t.building.connected = linked.some(b=>b.building.type==='farm'||b.building.type==='mine');
+    } else if(t.building.type==='shop'){
+      const linked = reachableBuildings(t,size);
+      t.building.connected = linked.some(b=>b.building.type==='factory');
+    }
+  }
+}
+
+/* ============ GAME STATE INIT ============ */
+function newGame(diffKey){
+  const cfg = DIFFICULTY[diffKey];
+  const size = cfg.grid;
+  STATE = {
+    diffKey, cfg,
+    size,
+    tiles: makeMap(size),
+    cash: cfg.startCash,
+    debt: 0,
+    turn: 1,
+    maxTurns: cfg.turns,
+    selectedBuild: null, // 'farm' | 'mine' | 'factory' | 'shop' | 'road' | null
+    rival: { primary:1, secondary:1, tertiary:1, gdp:0, history:[] },
+    gdpHistory: [],
+    lastEvent: null,
+    log: [],
+  };
+  // give player a starting road + one free farm near center to reduce blank-page confusion
+  const cx = Math.floor(size/2), cy = Math.floor(size/2);
+  STATE.tiles[cy][cx].road = true;
+  camOffsetX = window.innerWidth/2;
+  camOffsetY = 140;
+  recomputeConnectivity();
+}
+
+console.log('Stage 3 loaded OK');
+</script>
+
+
+<script>
+/* ============ EVENTS ============ */
+const EVENTS = [
+  { id:'drought', label:'Drought', desc:'Farms produce less unless near the river.',
+    apply(s){ s.activeEffects.droughtTurns = 2; } },
+  { id:'washout', label:'Road Washout', desc:'A road tile has flooded and needs repair.',
+    apply(s){
+      const roadTiles = [];
+      for(let y=0;y<s.size;y++) for(let x=0;x<s.size;x++)
+        if(s.tiles[y][x].road) roadTiles.push(s.tiles[y][x]);
+      if(roadTiles.length){
+        const t = roadTiles[Math.floor(Math.random()*roadTiles.length)];
+        t.flood = true;
+        s.activeEffects.floodedTile = t;
+      }
+    } },
+  { id:'festival', label:'Festival', desc:'Demand at shops spikes this turn.',
+    apply(s){ s.activeEffects.festivalTurns = 1; } },
+  { id:'breakdown', label:'Machinery Breakdown', desc:'One factory produces less this turn.',
+    apply(s){
+      const factories = [];
+      for(let y=0;y<s.size;y++) for(let x=0;x<s.size;x++){
+        const t=s.tiles[y][x];
+        if(t.building && t.building.type==='factory') factories.push(t);
+      }
+      if(factories.length){
+        const t = factories[Math.floor(Math.random()*factories.length)];
+        s.activeEffects.brokenFactory = t;
+      }
+    } },
+  { id:'tradedeal', label:'Trade Deal', desc:'Shipping costs drop for a turn.',
+    apply(s){ s.activeEffects.tradeDealTurns = 1; } },
+];
+
+function maybeTriggerEvent(){
+  STATE.activeEffects = {}; // reset per-turn transient effects
+  STATE.lastEvent = null;
+  if(Math.random() < STATE.cfg.eventChance){
+    let pool = EVENTS;
+    if(!STATE.cfg.washouts) pool = pool.filter(e=>e.id!=='washout');
+    const ev = pool[Math.floor(Math.random()*pool.length)];
+    ev.apply(STATE);
+    STATE.lastEvent = ev;
+  }
+}
+
+/* ============ ECONOMY SIMULATION ============
+   Each turn:
+   - primary buildings produce raw units (farms/mines)
+   - secondary buildings (factories), if connected to >=1 primary, consume raw
+     units up to their capacity and produce goods; efficiency scales with how
+     much raw supply is actually available relative to total secondary demand
+     (models oversupply/undersupply of primary sector)
+   - tertiary (shops), if connected to >=1 secondary, sell goods for cash;
+     efficiency scales with goods supply vs total shop demand capacity
+   - imbalance penalty: if one sector's total capacity wildly outstrips the
+     sector "downstream" of it, excess capacity sits idle (visualized as low
+     efficiency ring), teaching the balance lesson directly
+*/
+function buildingsOfType(type){
+  const out=[];
+  for(let y=0;y<STATE.size;y++) for(let x=0;x<STATE.size;x++){
+    const t = STATE.tiles[y][x];
+    if(t.building && t.building.type===type) out.push(t);
+  }
+  return out;
+}
+
+const BASE_OUTPUT = { farm: 10, mine: 14, factory: 12, shop: 12 };
+const UNIT_PRICE = { raw: 3, goods: 9 }; // goods sale price per unit at shop
+
+function isNearRiver(tile){
+  for(const [nx,ny] of neighbors(tile.x,tile.y,STATE.size)){
+    if(STATE.tiles[ny][nx].terrain==='river') return true;
+  }
+  return false;
+}
+
+function simulateTurnEconomy(){
+  recomputeConnectivity();
+  const fx = STATE.activeEffects || {};
+  let turnRevenue = 0, turnCost = 0;
+
+  // --- PRIMARY production ---
+  const farms = buildingsOfType('farm');
+  const mines = buildingsOfType('mine');
+  let rawAvailable = 0;
+  [...farms, ...mines].forEach(t=>{
+    let out = BASE_OUTPUT[t.building.type];
+    if(t.building.type==='farm' && fx.droughtTurns && !isNearRiver(t)) out *= 0.4;
+    t.building.output = out;
+    rawAvailable += out;
+  });
+
+  // --- SECONDARY consumption/production ---
+  const factories = buildingsOfType('factory').filter(t=>{
+    if(fx.brokenFactory === t) return true; // still counts, just penalized below
+    return true;
+  });
+  const connectedFactories = factories.filter(t=>t.building.connected);
+  let totalFactoryDemand = 0;
+  connectedFactories.forEach(t=>{
+    let cap = BASE_OUTPUT.factory;
+    if(fx.brokenFactory === t) cap *= 0.35;
+    t.building.capacity = cap;
+    totalFactoryDemand += cap;
+  });
+  // raw materials split proportionally among connected factories, capped by their capacity
+  let rawPool = rawAvailable;
+  let goodsAvailable = 0;
+  connectedFactories.forEach(t=>{
+    const share = totalFactoryDemand>0 ? (t.building.capacity/totalFactoryDemand) * rawAvailable : 0;
+    const used = Math.min(share, t.building.capacity);
+    t.building.efficiency = t.building.capacity>0 ? Math.min(1, used/t.building.capacity) : 0;
+    t.building.output = used; // goods produced 1:1 from raw used, simplified
+    goodsAvailable += used;
+    rawPool -= used;
+  });
+  // disconnected factories produce nothing
+  factories.filter(t=>!t.building.connected).forEach(t=>{ t.building.efficiency = 0; t.building.output = 0; });
+
+  // primary efficiency = how much of their output actually got bought by connected secondary
+  const rawUsedTotal = Math.max(0, rawAvailable - Math.max(rawPool,0));
+  [...farms,...mines].forEach(t=>{
+    const shareOfRaw = rawAvailable>0 ? t.building.output/rawAvailable : 0;
+    const soldEstimate = rawUsedTotal * shareOfRaw;
+    t.building.efficiency = t.building.output>0 ? Math.min(1, soldEstimate/t.building.output) : 0;
+    const revenue = soldEstimate * UNIT_PRICE.raw * 0.3; // small direct raw revenue (co-ops/local sale)
+    turnRevenue += revenue;
+  });
+
+  // --- TERTIARY sales ---
+  const shops = buildingsOfType('shop');
+  const connectedShops = shops.filter(t=>t.building.connected);
+  let totalShopDemandCap = 0;
+  connectedShops.forEach(t=>{
+    let cap = BASE_OUTPUT.shop;
+    if(fx.festivalTurns) cap *= 1.6;
+    t.building.capacity = cap;
+    totalShopDemandCap += cap;
+  });
+  let goodsPool = goodsAvailable;
+  connectedShops.forEach(t=>{
+    const share = totalShopDemandCap>0 ? (t.building.capacity/totalShopDemandCap) * goodsAvailable : 0;
+    const sold = Math.min(share, t.building.capacity);
+    t.building.efficiency = t.building.capacity>0 ? Math.min(1, sold/t.building.capacity) : 0;
+    t.building.output = sold;
+    let price = UNIT_PRICE.goods;
+    if(fx.tradeDealTurns) price *= 1.15; // lower shipping cost -> better margin, modeled as higher net price
+    turnRevenue += sold * price;
+    goodsPool -= sold;
+  });
+  shops.filter(t=>!t.building.connected).forEach(t=>{ t.building.efficiency=0; t.building.output=0; });
+
+  // secondary efficiency adjusted again by whether shops actually bought the goods (downstream imbalance)
+  const goodsUsedTotal = Math.max(0, goodsAvailable - Math.max(goodsPool,0));
+  connectedFactories.forEach(t=>{
+    const shareOfGoods = goodsAvailable>0 ? t.building.output/goodsAvailable : 0;
+    const soldEstimate = goodsUsedTotal*shareOfGoods;
+    const sellThrough = t.building.output>0 ? Math.min(1, soldEstimate/t.building.output) : 1;
+    t.building.efficiency = Math.min(t.building.efficiency, sellThrough);
+  });
+
+  // upkeep costs: every building has small maintenance
+  const allBuildings = [...farms,...mines,...factories,...shops];
+  turnCost += allBuildings.length * 4;
+  // interest on debt
+  if(STATE.debt>0){ turnCost += STATE.debt*0.08; }
+
+  const profit = turnRevenue - turnCost;
+  STATE.cash += profit;
+  STATE.gdpHistory.push(turnRevenue);
+
+  return {
+    turnRevenue, turnCost, profit,
+    rawAvailable, goodsAvailable,
+    primaryCount: farms.length+mines.length,
+    secondaryCount: factories.length,
+    tertiaryCount: shops.length,
+  };
+}
+
+/* ============ RIVAL SIMULATION (simplified, no grid) ============ */
+function simulateRivalTurn(){
+  const r = STATE.rival;
+  const mode = STATE.cfg.rivalMode;
+  if(mode==='adaptive'){
+    // grow whichever sector is weakest relative to others (min-maxing balance)
+    const vals = {primary:r.primary, secondary:r.secondary, tertiary:r.tertiary};
+    const weakest = Object.keys(vals).reduce((a,b)=>vals[a]<=vals[b]?a:b);
+    r[weakest] += (0.6 + Math.random()*0.6) * STATE.cfg.rivalGrowth;
+  } else {
+    // steady: small balanced growth across all three, low variance
+    r.primary += (0.3+Math.random()*0.3) * STATE.cfg.rivalGrowth;
+    r.secondary += (0.3+Math.random()*0.3) * STATE.cfg.rivalGrowth;
+    r.tertiary += (0.3+Math.random()*0.3) * STATE.cfg.rivalGrowth;
+  }
+  // event impact on rival too, for fairness (same drought/festival effects roughly)
+  const fx = STATE.activeEffects || {};
+  if(fx.droughtTurns) r.primary *= 0.85;
+  if(fx.festivalTurns) r.tertiary *= 1.2;
+
+  const balance = Math.min(r.primary,r.secondary,r.tertiary) / Math.max(r.primary,r.secondary,r.tertiary);
+  const gdpGain = (r.primary+r.secondary+r.tertiary) * 6 * (0.5+0.5*balance);
+  r.gdp += gdpGain;
+  r.history.push(gdpGain);
+  return gdpGain;
+}
+
+console.log('Stage 4 loaded OK');
+</script>
+
+
+<script>
+/* ============ SCREEN MANAGEMENT ============ */
+function showScreen(id){
+  ['screenTitle','screenGame','screenReport','screenEnd','screenRules'].forEach(s=>{
+    document.getElementById(s).classList.toggle('hidden', s!==id);
+  });
+}
+
+/* ============ BUILD PANEL ============ */
+function renderBuildButtons(){
+  const wrap = document.getElementById('buildButtons');
+  wrap.innerHTML = '';
+  STATE.cfg.buildings.forEach(type=>{
+    const info = BUILD_INFO[type];
+    const btn = document.createElement('button');
+    btn.className = 'build-btn clickable' + (STATE.selectedBuild===type ? ' selected':'');
+    btn.innerHTML = `<span>${info.label}</span><span>$${info.cost}</span>`;
+    btn.disabled = STATE.cash < info.cost;
+    btn.onclick = ()=>{ STATE.selectedBuild = (STATE.selectedBuild===type ? null : type); renderBuildButtons(); };
+    wrap.appendChild(btn);
+  });
+  const roadBtn = document.createElement('button');
+  roadBtn.className = 'build-btn clickable' + (STATE.selectedBuild==='road' ? ' selected':'');
+  roadBtn.innerHTML = `<span>Road</span><span>$${ROAD_COST}</span>`;
+  roadBtn.disabled = STATE.cash < ROAD_COST;
+  roadBtn.onclick = ()=>{ STATE.selectedBuild = (STATE.selectedBuild==='road' ? null : 'road'); renderBuildButtons(); };
+  wrap.appendChild(roadBtn);
+
+  document.getElementById('loanControls').classList.toggle('hidden', !STATE.cfg.loans);
+}
+
+function updateHud(){
+  document.getElementById('cashVal').textContent = Math.round(STATE.cash);
+  document.getElementById('turnVal').textContent = STATE.turn;
+  document.getElementById('turnMax').textContent = STATE.maxTurns;
+  document.getElementById('debtBox').classList.toggle('hidden', !STATE.cfg.loans);
+  document.getElementById('debtVal').textContent = Math.round(STATE.debt);
+
+  const farms = buildingsOfType('farm').length + buildingsOfType('mine').length;
+  const secs = buildingsOfType('factory').length;
+  const terts = buildingsOfType('shop').length;
+  const maxB = Math.max(farms,secs,terts,1);
+  document.getElementById('barPrimary').style.width = (farms/maxB*100)+'%';
+  document.getElementById('barSecondary').style.width = (secs/maxB*100)+'%';
+  document.getElementById('barTertiary').style.width = (terts/maxB*100)+'%';
+
+  document.getElementById('rivalGdp').textContent = Math.round(STATE.rival.gdp);
+  const myGdp = STATE.gdpHistory.reduce((a,b)=>a+b,0);
+  document.getElementById('myGdp').textContent = Math.round(myGdp);
+
+  const banner = document.getElementById('eventBanner');
+  if(STATE.lastEvent){
+    banner.classList.remove('hidden');
+    banner.innerHTML = `<b>${STATE.lastEvent.label}</b><br>${STATE.lastEvent.desc}`;
+  } else {
+    banner.classList.add('hidden');
+  }
+}
+
+/* ============ TILE CLICK HANDLING ============ */
+canvas.addEventListener('click', (e)=>{
+  if(!STATE || !STATE.selectedBuild) return;
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX-rect.left, my = e.clientY-rect.top;
+  const {x,y} = screenToIso(mx,my);
+  if(x<0||y<0||x>=STATE.size||y>=STATE.size) return;
+  const tile = STATE.tiles[y][x];
+
+  if(STATE.selectedBuild==='road'){
+    if(tile.building) return;
+    if(tile.terrain==='river') return;
+    if(tile.road) return;
+    if(STATE.cash < ROAD_COST) return;
+    tile.road = true; tile.flood = false;
+    STATE.cash -= ROAD_COST;
+  } else {
+    const type = STATE.selectedBuild;
+    const info = BUILD_INFO[type];
+    if(tile.building || tile.road) return;
+    if(tile.terrain==='river') return;
+    if(type==='mine' && tile.terrain!=='hill') return;
+    if(type!=='mine' && tile.terrain==='hill') return;
+    if(STATE.cash < info.cost) return;
+    tile.building = { type, efficiency:0, output:0, connected:false };
+    STATE.cash -= info.cost;
+  }
+  recomputeConnectivity();
+  renderBuildButtons();
+  updateHud();
+});
+
+/* ============ CAMERA PAN (drag) ============ */
+let dragging=false, dragStart=null;
+canvas.addEventListener('mousedown', e=>{ dragging=true; dragStart={x:e.clientX,y:e.clientY,ox:camOffsetX,oy:camOffsetY}; });
+window.addEventListener('mousemove', e=>{
+  if(!dragging || !dragStart) return;
+  const dx = e.clientX-dragStart.x, dy = e.clientY-dragStart.y;
+  if(Math.abs(dx)>3||Math.abs(dy)>3){
+    camOffsetX = dragStart.ox+dx; camOffsetY = dragStart.oy+dy;
+    dragStart.moved = true;
+  }
+});
+window.addEventListener('mouseup', ()=>{ dragging=false; });
+
+/* touch support: single-finger drag to pan, tap to build */
+let touchStart=null;
+canvas.addEventListener('touchstart', e=>{
+  const t = e.touches[0];
+  touchStart = {x:t.clientX,y:t.clientY,ox:camOffsetX,oy:camOffsetY,moved:false};
+},{passive:true});
+canvas.addEventListener('touchmove', e=>{
+  if(!touchStart) return;
+  const t = e.touches[0];
+  const dx = t.clientX-touchStart.x, dy = t.clientY-touchStart.y;
+  if(Math.abs(dx)>6||Math.abs(dy)>6){
+    camOffsetX = touchStart.ox+dx; camOffsetY = touchStart.oy+dy;
+    touchStart.moved = true;
+  }
+},{passive:true});
+canvas.addEventListener('touchend', e=>{
+  if(touchStart && !touchStart.moved){
+    const rect = canvas.getBoundingClientRect();
+    const mx = touchStart.x-rect.left, my = touchStart.y-rect.top;
+    canvas.dispatchEvent(new MouseEvent('click', {clientX: touchStart.x, clientY: touchStart.y}));
+  }
+  touchStart = null;
+});
+
+console.log('Stage 6a loaded OK');
+</script>
+
+
+<script>
+/* ============ TRUCK ANIMATION ============
+   Build a list of simple point-to-point trips (farm/mine -> factory, factory -> shop)
+   based on which connections actually carried goods this turn, then animate small
+   crate-carrying dots easing along the straight iso-screen line between them. */
+let activeTrucks = [];
+let animPlaying = false;
+let animSkip = false;
+
+function buildTruckTrips(){
+  const trips = [];
+  const factories = buildingsOfType('factory').filter(t=>t.building.connected && t.building.output>0.1);
+  const shops = buildingsOfType('shop').filter(t=>t.building.connected && t.building.output>0.1);
+  const primaries = [...buildingsOfType('farm'), ...buildingsOfType('mine')].filter(t=>t.building.output>0.1);
+
+  primaries.forEach(p=>{
+    if(factories.length){
+      const target = factories[Math.floor(Math.random()*factories.length)];
+      trips.push({from:p, to:target, color:'#caa34a'});
+    }
+  });
+  factories.forEach(f=>{
+    if(shops.length){
+      const target = shops[Math.floor(Math.random()*shops.length)];
+      trips.push({from:f, to:target, color:'#8a8f99'});
+    }
+  });
+  return trips;
+}
+
+function playTruckAnimation(cb){
+  const trips = buildTruckTrips();
+  if(trips.length===0){ cb(); return; }
+  animPlaying = true; animSkip = false;
+  document.getElementById('skipAnimBtn').classList.remove('hidden');
+  activeTrucks = trips.map(t=>({...t, progress:0, speed: 0.008 + Math.random()*0.006}));
+
+  function step(){
+    if(animSkip){ finish(); return; }
+    let allDone = true;
+    activeTrucks.forEach(t=>{
+      t.progress += t.speed;
+      if(t.progress < 1) allDone = false;
+    });
+    if(allDone){ finish(); return; }
+    requestAnimationFrame(step);
+  }
+  function finish(){
+    animPlaying = false;
+    activeTrucks = [];
+    document.getElementById('skipAnimBtn').classList.add('hidden');
+    cb();
+  }
+  step();
+}
+document.getElementById('skipAnimBtn').onclick = ()=>{ animSkip = true; };
+
+/* draw trucks - hooked into main render loop */
+function drawTrucks(){
+  if(!activeTrucks.length) return;
+  activeTrucks.forEach(t=>{
+    const a = isoToScreen(t.from.x, t.from.y);
+    const b = isoToScreen(t.to.x, t.to.y);
+    const p = t.progress;
+    const cx = a.sx + (b.sx-a.sx)*p;
+    const cy = (a.sy + (b.sy-a.sy)*p) - Math.sin(p*Math.PI)*18*zoom - 14*zoom;
+    ctx.fillStyle = t.color;
+    ctx.fillRect(cx-5*zoom, cy-4*zoom, 10*zoom, 8*zoom);
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.fillRect(cx-5*zoom, cy+4*zoom, 10*zoom, 2*zoom);
+  });
+}
+const _origRender = render;
+render = function(){}; // placeholder to avoid double RAF; real loop redefined below
+cancelAnimationFrame && null;
+
+function mainLoop(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = '#1c130b';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  if(STATE){
+    drawGround();
+    drawBuildings();
+    drawTrucks();
+  }
+  requestAnimationFrame(mainLoop);
+}
+requestAnimationFrame(mainLoop);
+
+/* ============ COMMERCE CONCEPT TEXT ============ */
+function generateConcept(result){
+  const farms = buildingsOfType('farm').length+buildingsOfType('mine').length;
+  const secs = buildingsOfType('factory').length;
+  const terts = buildingsOfType('shop').length;
+  const disconnected = [...buildingsOfType('factory'),...buildingsOfType('shop')].filter(t=>!t.building.connected).length;
+
+  if(disconnected>0){
+    return "Some of your buildings aren't connected by road to their supply chain, so they're producing at reduced efficiency or not at all. In a real economy, infrastructure like roads and transport links is just as important as the businesses themselves.";
+  }
+  if(farms > secs*1.8 && secs>0){
+    return "You have far more primary producers than factories to process their output. This models a classic imbalance: raw materials without processing capacity just sit unsold, dragging down farm profitability even though you're producing plenty.";
+  }
+  if(secs > terts*1.8 && terts>0){
+    return "Your factories are outproducing what your shops can sell. Goods are piling up unsold, a reminder that secondary sector growth only pays off if tertiary sector demand can absorb it.";
+  }
+  if(STATE.lastEvent){
+    return `The ${STATE.lastEvent.label.toLowerCase()} this turn shows how external shocks ripple through a connected economy, not every downturn comes from bad planning.`;
+  }
+  if(result.profit>0){
+    return "Your sectors are reasonably balanced this turn, profit equals revenue minus costs, and balance keeps every building running near full efficiency.";
+  }
+  return "A loss this turn: costs outpaced revenue. Check whether you're overbuilding one sector relative to what it can actually sell to.";
+}
+
+/* ============ END TURN FLOW ============ */
+function endTurn(){
+  if(animPlaying) return;
+  STATE.selectedBuild = null;
+  maybeTriggerEvent();
+  playTruckAnimation(()=>{
+    const result = simulateTurnEconomy();
+    const rivalGain = simulateRivalTurn();
+    showReport(result);
+  });
+}
+document.getElementById('endTurnBtn').onclick = endTurn;
+
+function showReport(result){
+  document.getElementById('repTurn').textContent = STATE.turn;
+  document.getElementById('repRevenue').textContent = '$'+Math.round(result.turnRevenue);
+  document.getElementById('repCost').textContent = '$'+Math.round(result.turnCost);
+  const profitEl = document.getElementById('repProfit');
+  profitEl.textContent = (result.profit>=0?'+$':'-$')+Math.round(Math.abs(result.profit));
+  profitEl.style.color = result.profit>=0 ? '#3f7d4e' : '#c0392b';
+  const myGdp = STATE.gdpHistory.reduce((a,b)=>a+b,0);
+  document.getElementById('repMyGdp').textContent = Math.round(myGdp);
+  document.getElementById('repRivalGdp').textContent = Math.round(STATE.rival.gdp);
+  document.getElementById('repConcept').textContent = generateConcept(result);
+  showScreen('screenReport');
+}
+
+document.getElementById('continueBtn').onclick = ()=>{
+  if(STATE.turn >= STATE.maxTurns){
+    endGame();
+  } else {
+    STATE.turn += 1;
+    updateHud();
+    renderBuildButtons();
+    showScreen('screenGame');
+  }
+};
+
+/* ============ LOANS (hard mode) ============ */
+document.getElementById('borrowBtn').onclick = ()=>{
+  STATE.cash += 100; STATE.debt += 100;
+  updateHud(); renderBuildButtons();
+};
+document.getElementById('repayBtn').onclick = ()=>{
+  const amt = Math.min(50, STATE.debt, STATE.cash);
+  if(amt<=0) return;
+  STATE.cash -= amt; STATE.debt -= amt;
+  updateHud(); renderBuildButtons();
+};
+
+/* ============ LEADERBOARD ============ */
+function lbKey(diffKey){ return 'sector-balance-lb-'+diffKey+'-v1'; }
+function loadLB(diffKey){
+  try{ return JSON.parse(localStorage.getItem(lbKey(diffKey))||'[]'); }catch(e){ return []; }
+}
+function saveLB(diffKey, list){ localStorage.setItem(lbKey(diffKey), JSON.stringify(list)); }
+
+function renderLBList(){
+  const list = loadLB(STATE.diffKey);
+  const wrap = document.getElementById('lbList');
+  wrap.innerHTML = list.length ? '' : '<div style="font-size:12px;opacity:0.7;">No scores yet, be the first.</div>';
+  list.slice(0,5).forEach((e,i)=>{
+    const row = document.createElement('div');
+    row.className = 'lb-row';
+    row.innerHTML = `<span>${i+1}. ${e.name}</span><span>${Math.round(e.gdp)}</span>`;
+    wrap.appendChild(row);
+  });
+}
+
+function endGame(){
+  const myGdp = STATE.gdpHistory.reduce((a,b)=>a+b,0);
+  document.getElementById('endMyGdp').textContent = Math.round(myGdp);
+  document.getElementById('endRivalGdp').textContent = Math.round(STATE.rival.gdp);
+  document.getElementById('endTitle').textContent = myGdp >= STATE.rival.gdp ? 'You Beat The Rival Region!' : 'The Rival Region Won This Time';
+  const disconnected = [...buildingsOfType('factory'),...buildingsOfType('shop')].filter(t=>!t.building.connected).length;
+  document.getElementById('endSummary').textContent = myGdp>=STATE.rival.gdp
+    ? "Solid work keeping your sectors connected and balanced, that's exactly what let your economy outproduce the rival's."
+    : "The rival region out-grew you this run. Look back at whether one sector got too far ahead of the others, or whether some buildings lost their road connection.";
+
+  const list = loadLB(STATE.diffKey);
+  const qualifies = list.length<5 || myGdp > Math.min(...list.map(e=>e.gdp));
+  document.getElementById('nameEntry').classList.toggle('hidden', !qualifies);
+  renderLBList();
+
+  document.getElementById('saveScoreBtn').onclick = ()=>{
+    const name = (document.getElementById('nameInput').value||'Player').slice(0,16);
+    const list = loadLB(STATE.diffKey);
+    list.push({name, gdp: myGdp});
+    list.sort((a,b)=>b.gdp-a.gdp);
+    saveLB(STATE.diffKey, list.slice(0,5));
+    document.getElementById('nameEntry').classList.add('hidden');
+    renderLBList();
+  };
+
+  showScreen('screenEnd');
+}
+
+document.getElementById('playAgainBtn').onclick = ()=>{ showScreen('screenTitle'); };
+
+/* ============ TITLE BACKGROUND DECOR ============ */
+function buildTitleBg(){
+  const layer = document.getElementById('bgLayer');
+  // rolling hill silhouettes
+  const hillColors = ['#2f4f31','#274528','#3a5f3a'];
+  hillColors.forEach((c,i)=>{
+    const h = document.createElement('div');
+    h.className = 'bgHill';
+    h.style.background = c;
+    h.style.left = (-10 + i*5)+'%';
+    h.style.width = '120%';
+    h.style.height = (90 + i*30)+'px';
+    h.style.zIndex = i;
+    layer.appendChild(h);
+  });
+  // drifting pixel clouds at varying heights/speeds
+  for(let i=0;i<5;i++){
+    const c = document.createElement('div');
+    c.className = 'bgCloud';
+    const w = 50 + Math.random()*40, h = w*0.35;
+    c.style.width = w+'px'; c.style.height = h+'px';
+    c.style.top = (8 + Math.random()*30)+'%';
+    const dur = 26 + Math.random()*22;
+    c.style.animation = `driftCloud ${dur}s linear infinite`;
+    c.style.animationDelay = (-Math.random()*dur)+'s';
+    layer.appendChild(c);
+  }
+  // small floating pixel icons representing the three sectors, gently bobbing
+  const icons = [
+    {sym:'\u25B2', color:'#caa34a', left:'18%', top:'62%'},   // farm-ish
+    {sym:'\u25A0', color:'#8a8f99', left:'70%', top:'55%'},   // factory-ish
+    {sym:'$', color:'#c65a2b', left:'45%', top:'70%'},        // shop-ish
+  ];
+  icons.forEach((ic,i)=>{
+    const el = document.createElement('div');
+    el.className = 'bgFloat';
+    el.textContent = ic.sym;
+    el.style.color = ic.color;
+    el.style.left = ic.left; el.style.top = ic.top;
+    el.style.animation = `bob ${3+i*0.6}s ease-in-out infinite`;
+    layer.appendChild(el);
+  });
+}
+buildTitleBg();
+
+document.getElementById('howToPlayBtn').onclick = ()=>{ showScreen('screenRules'); };
+document.getElementById('closeRulesBtn').onclick = ()=>{ showScreen('screenTitle'); };
+
+/* ============ BOOT ============ */
+document.querySelectorAll('.diff-card').forEach(card=>{
+  card.addEventListener('click', ()=>{
+    const diff = card.getAttribute('data-diff');
+    newGame(diff);
+    renderBuildButtons();
+    updateHud();
+    showScreen('screenGame');
+  });
+});
+
+console.log('Stage 7 loaded OK - game ready');
+</script>
+
+</body>
+</html>
